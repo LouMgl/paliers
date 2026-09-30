@@ -51,6 +51,32 @@ export function beep(notes: number[] = [660, 880]): void {
   } catch { /* le son est un bonus */ }
 }
 
+export function unlockAudio(): void {
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === "suspended") void audio.resume();
+  } catch { /* ignoré */ }
+}
+
+/** Son d'annonce de la mobilité : actif par défaut, désactivable dans Profil. */
+export function cue(notes: number[], volume = 0.12): void {
+  if (!state.prefs.cueSound) return;
+  try {
+    audio ??= new AudioContext();
+    if (audio.state === "suspended") void audio.resume();
+    let t = audio.currentTime;
+    for (const f of notes) {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = "triangle"; o.frequency.value = f;
+      g.gain.setValueAtTime(volume, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.connect(g).connect(audio.destination);
+      o.start(t); o.stop(t + 0.24);
+      t += 0.16;
+    }
+  } catch { /* le son est un bonus */ }
+}
+
+
 export function vibrate(ms = 40): void {
   try { navigator.vibrate?.(ms); } catch { /* ignoré */ }
 }
@@ -116,6 +142,7 @@ export function videoBlock(id: string, url: string | undefined, embed: string | 
   }
   return `${body}<button class="btn ghost small" data-act="set-video" data-id="${esc(id)}">${url ? "Changer le lien vidéo" : "Ajouter un lien vidéo"}</button>`;
 }
+
 
 
 

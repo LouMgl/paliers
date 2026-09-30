@@ -9,6 +9,8 @@ export interface Prefs {
   bodyweightKg?: number;
   targetWeightKg?: number;
   sound: boolean;
+  /** Sons d'annonce de la mobilité (décompte avant chaque exercice) */
+  cueSound: boolean;
   animations: boolean;
   theme: "auto" | "light" | "dark";
   favorites: string[];
@@ -16,7 +18,7 @@ export interface Prefs {
   videos: Record<string, string>;
 }
 
-export const DEFAULT_PREFS: Prefs = { name: "Héros", sound: false, animations: true, theme: "auto", favorites: [], videos: {} };
+export const DEFAULT_PREFS: Prefs = { name: "Héros", sound: false, cueSound: true, animations: true, theme: "auto", favorites: [], videos: {} };
 
 export const state = {
   sets: [] as SetRow[],
@@ -91,4 +93,6 @@ export function snapshot(): Snapshot {
 }
 
 recompute();
+
+
 

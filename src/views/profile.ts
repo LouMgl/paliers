@@ -127,6 +127,7 @@ export const profile: View = {
     <label class="field"><span>Cible de poids (kg), facultative</span><input type="number" inputmode="decimal" step="0.1" min="30" max="250" id="pf-target" value="${p.targetWeightKg ?? ""}"><small class="hint">C'est toi qui la fixes. L'app ne juge aucun chiffre et n'encourage aucune restriction.</small></label></section>
     <section class="card"><h3>Confort</h3>
     <label class="check"><input type="checkbox" id="pf-anim" ${p.animations ? "checked" : ""}> Animations de récompense</label>
+    <label class="check"><input type="checkbox" id="pf-cue" ${p.cueSound ? "checked" : ""}> Annonce sonore avant chaque exercice de mobilité</label>
     <label class="check"><input type="checkbox" id="pf-sound" ${p.sound ? "checked" : ""}> Sons courts et vibrations</label>
     <label class="field" style="margin-top:8px"><span>Thème</span><select id="pf-theme"><option value="auto" ${p.theme === "auto" ? "selected" : ""}>Automatique</option><option value="light" ${p.theme === "light" ? "selected" : ""}>Clair</option><option value="dark" ${p.theme === "dark" ? "selected" : ""}>Sombre</option></select></label></section>
     <section class="card"><h3>Sauvegarde</h3><p class="hint">Le stockage d'un iPhone n'est pas garanti éternel : exporte ta sauvegarde de temps en temps (photos de recettes incluses).</p>
@@ -153,11 +154,14 @@ export const profile: View = {
     else if (el.id === "pf-bw") await savePrefs({ bodyweightKg: num(n("#pf-bw")) });
     else if (el.id === "pf-target") await savePrefs({ targetWeightKg: num(n("#pf-target")) });
     else if (el.id === "pf-anim") await savePrefs({ animations: (el as HTMLInputElement).checked });
+    else if (el.id === "pf-cue") await savePrefs({ cueSound: (el as HTMLInputElement).checked });
     else if (el.id === "pf-sound") await savePrefs({ sound: (el as HTMLInputElement).checked });
     else if (el.id === "pf-theme") { await savePrefs({ theme: el.value as Prefs["theme"] }); applyTheme(); }
     toast("Enregistré");
   },
 };
+
+
 
 
 

@@ -4,7 +4,7 @@ import { testsImproved, type MobilityTest } from "../engine.ts";
 import { lineChart } from "../charts.ts";
 import { RPG } from "../rpg.config.ts";
 import { addLog, dayKey, snapshot, state, videoFor } from "../store.ts";
-import { app, beep, celebrate, closeDlg, esc, fmtDate, openDlg, toast, vibrate, videoBlock, $ } from "../ui.ts";
+import { app, cue, unlockAudio, celebrate, closeDlg, esc, fmtDate, openDlg, toast, vibrate, videoBlock, $ } from "../ui.ts";
 import { embedUrl } from "../files.ts";
 import type { View } from "./types.ts";
 
@@ -12,11 +12,16 @@ interface Player {
   r: Routine;
   steps: StepPlan[];
   i: number;
+  /** Échéance de la phase en cours (décompte d'annonce, puis exercice) */
   endAt: number;
   total: number;
   paused: boolean;
   remain: number;
+  phase: "intro" | "run";
+  lastSec: number;
 }
+
+const INTRO_SECONDS = 3;
 
 let P: Player | null = null;
 let timer: number | undefined;
@@ -38,23 +43,52 @@ function stopPlayer(): void {
   if (timer) clearInterval(timer);
   timer = undefined;
   P = null;
+  document.body.classList.remove("playing");
   void lockScreen(false);
+  try { if (document.fullscreenElement) void document.exitFullscreen(); } catch { /* ignoré */ }
 }
 
+/** Nouvel exercice : annonce sonore (3, 2, 1, départ), puis la vidéo démarre et le minuteur de l'exercice aussi. */
 function goStep(i: number): void {
   if (!P) return;
+  const st = P.steps[i];
   P.i = i;
-  P.total = P.steps[i].duree;
-  P.endAt = Date.now() + P.total * 1000;
+  P.total = st.duree;
   P.paused = false;
+  if (st.prep) {
+    P.phase = "run";
+    P.endAt = Date.now() + st.duree * 1000;
+  } else {
+    P.phase = "intro";
+    P.lastSec = -1;
+    P.endAt = Date.now() + INTRO_SECONDS * 1000;
+    cue([523, 659]); // petit jingle : « ça va commencer »
+  }
   app.rerender();
   vibrate(40);
-  if (i > 0) beep([720]);
 }
 
 function tick(): void {
   if (!P || P.paused) return;
-  const rem = Math.max(0, Math.ceil((P.endAt - Date.now()) / 1000));
+  const now = Date.now();
+  if (P.phase === "intro") {
+    const sec = Math.max(0, Math.ceil((P.endAt - now) / 1000));
+    if (sec !== P.lastSec) {
+      P.lastSec = sec;
+      const n = document.getElementById("intronum");
+      if (n) n.textContent = String(sec);
+      if (sec > 0) cue([660], 0.1);
+    }
+    if (now >= P.endAt) {
+      P.phase = "run";
+      P.endAt = now + P.total * 1000;
+      cue([880, 1175]); // top départ
+      vibrate(60);
+      app.rerender(); // la vidéo se charge ici
+    }
+    return;
+  }
+  const rem = Math.max(0, Math.ceil((P.endAt - now) / 1000));
   const n = $("#tnum"), pg = document.getElementById("pg");
   if (n) n.textContent = fmt(rem);
   if (pg) pg.setAttribute("stroke-dashoffset", String(CIRC * (1 - rem / P.total)));
@@ -88,12 +122,22 @@ function renderPlayer(): string {
   const total = p.steps.length - 1;
   const url = st.prep ? undefined : videoFor(st.id);
   const emb = embedUrl(url, true);
-  const vid = emb && navigator.onLine ? `<div class="video"><iframe src="${esc(emb)}" title="Démonstration : ${esc(st.nom)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>` : "";
-  return `<div class="player"><p class="prog">${st.prep ? "Prépare-toi" : `Étape ${p.i} sur ${total}`}</p>
-    <div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="tr" cx="60" cy="60" r="52"/><circle class="pg" id="pg" cx="60" cy="60" r="52" stroke-dasharray="${CIRC}" stroke-dashoffset="0"/></svg><div class="num" id="tnum" role="timer">${fmt(st.duree)}</div></div>
-    ${vid}<h2>${esc(st.nom)}</h2>${st.side ? `<p class="side">Côté ${st.side}</p>` : ""}<p class="cue">${esc(st.consignes)}</p>
+  let stage = "";
+  if (p.phase === "intro") {
+    const sec = Math.max(1, Math.ceil((p.endAt - Date.now()) / 1000));
+    stage = `<div class="fs-stage intro" role="status" aria-live="polite"><p>Ça va commencer…</p><b id="intronum">${sec}</b><span>${esc(st.nom)}${st.side ? ` · côté ${st.side}` : ""}</span></div>`;
+  } else if (emb && navigator.onLine) {
+    stage = `<div class="fs-stage"><iframe src="${esc(emb)}" title="Démonstration : ${esc(st.nom)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+  } else if (!st.prep) {
+    stage = `<div class="fs-stage intro"><p>${navigator.onLine ? "Pas de vidéo pour cet exercice" : "Hors ligne : pas de vidéo"}</p><span>Suis les consignes écrites ci-dessous</span></div>`;
+  }
+  return `<div class="player fs ${stage ? "" : "novideo"}">${stage}
+    <div class="fs-info"><p class="prog">${st.prep ? "Prépare-toi" : `Étape ${p.i} sur ${total}`}</p>
+    <div class="fs-row"><div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="tr" cx="60" cy="60" r="52"/><circle class="pg" id="pg" cx="60" cy="60" r="52" stroke-dasharray="${CIRC}" stroke-dashoffset="${p.phase === "intro" || st.prep ? 0 : CIRC * (1 - Math.max(0, Math.ceil((p.endAt - Date.now()) / 1000)) / p.total)}"/></svg><div class="num" id="tnum" role="timer">${fmt(p.phase === "intro" ? st.duree : Math.max(0, Math.ceil((p.endAt - Date.now()) / 1000)))}</div></div>
+    <div><h2>${esc(st.nom)}</h2>${st.side ? `<p class="side">Côté ${st.side}</p>` : ""}</div></div>
+    <p class="cue">${esc(st.consignes)}</p>
     <div class="pbtns"><button class="btn" data-act="pause" id="pbtn">Pause</button><button class="btn" data-act="skip">Passer</button><button class="btn ghost" data-act="quit">Quitter</button></div>
-    <p class="hint">Douleur vive, douleur qui descend dans la jambe ou fourmillements : arrête.</p></div>`;
+    <p class="hint">Douleur vive, douleur qui descend dans la jambe ou fourmillements : arrête.</p></div></div>`;
 }
 
 function testsSection(): string {
@@ -179,7 +223,10 @@ export const move: View = {
     if (act === "play") {
       const r = ROUTINES.find((x) => x.id === el.dataset.id)!;
       done = null;
-      P = { r, steps: buildSteps(r), i: 0, endAt: 0, total: 0, paused: false, remain: 0 };
+      P = { r, steps: buildSteps(r), i: 0, endAt: 0, total: 0, paused: false, remain: 0, phase: "run", lastSec: -1 };
+      unlockAudio(); // le son doit être débloqué par un geste : ce tap sur « Démarrer »
+      document.body.classList.add("playing");
+      try { void document.documentElement.requestFullscreen?.(); } catch { /* iPhone : l'app installée est déjà en plein écran */ }
       void lockScreen(true);
       goStep(0);
       timer = window.setInterval(tick, 250);
@@ -202,6 +249,7 @@ export const move: View = {
 };
 
 export function setMoment(m: string): void { moment = m as Moment | "all"; }
+
 
 
 
