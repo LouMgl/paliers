@@ -1,5 +1,6 @@
-﻿import { db } from "../db.ts";
-import { characterExport } from "../engine.ts";
+﻿import { db, type Recipe } from "../db.ts";
+import { characterExport, type LogRow, type MobilityTest } from "../engine.ts";
+import type { MeasureRow, SetRow } from "../hevy.ts";
 import { blobToDataUrl, dataUrlToBlob, readText, saveJson } from "../files.ts";
 import { DEFAULT_PREFS, loadAll, savePrefs, state, type Prefs } from "../store.ts";
 import { app, esc, fmtInt, toast, $ } from "../ui.ts";
@@ -48,6 +49,65 @@ async function importBackup(file: File): Promise<void> {
 }
 const dataUrl2 = dataUrlToBlob;
 
+/** Fusionne une sauvegarde avec les données de cet appareil : ajoute ce qui manque, n'efface ni ne remplace rien. */
+async function mergeBackup(file: File): Promise<void> {
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(await readText(file)); } catch { toast("Ce fichier n'est pas une sauvegarde valide."); return; }
+  if (data.schema !== "paliers.backup/1") { toast("Ce fichier n'est pas une sauvegarde Paliers."); return; }
+  const arr = <T>(k: string): T[] => (Array.isArray(data[k]) ? (data[k] as T[]) : []);
+  const added = { sets: 0, measures: 0, logs: 0, tests: 0, recipes: 0, photos: 0 };
+
+  const inSets = arr<SetRow>("sets");
+  const haveSets = new Set((await db.sets.bulkGet(inSets.map((s) => s.key))).map((s) => s?.key));
+  const newSets = inSets.filter((s) => !haveSets.has(s.key));
+  await db.sets.bulkPut(newSets);
+  added.sets = newSets.length;
+
+  const haveM = new Set((await db.measures.toArray()).map((m) => m.date));
+  const newM = arr<MeasureRow>("measures").filter((m) => !haveM.has(m.date));
+  await db.measures.bulkPut(newM);
+  added.measures = newM.length;
+
+  const logKey = (l: LogRow) => `${l.type}|${l.day}|${l.ref ?? ""}|${l.label}`;
+  const haveL = new Set((await db.logs.toArray()).map(logKey));
+  const newL: LogRow[] = [];
+  for (const l of arr<LogRow>("logs")) { if (!haveL.has(logKey(l))) { haveL.add(logKey(l)); newL.push(l); } }
+  await db.logs.bulkAdd(newL);
+  added.logs = newL.length;
+
+  const haveT = new Set((await db.tests.toArray()).map((t) => t.date));
+  const newT = arr<MobilityTest>("tests").filter((t) => !haveT.has(t.date));
+  await db.tests.bulkPut(newT);
+  added.tests = newT.length;
+
+  const haveR = new Set((await db.recipes.toArray()).map((r) => r.id));
+  const newR = arr<Recipe>("recipes").filter((r) => !haveR.has(r.id));
+  await db.recipes.bulkPut(newR);
+  added.recipes = newR.length;
+
+  const haveP = new Set((await db.photos.toArray()).map((p) => p.id));
+  for (const p of arr<{ id: string; dataUrl: string }>("photos")) {
+    if (haveP.has(p.id)) continue;
+    await db.photos.put({ id: p.id, blob: await dataUrl2(p.dataUrl) });
+    added.photos++;
+  }
+
+  // réglages : on garde les tiens, on ajoute seulement les favoris et les vidéos qui manquent
+  const inPrefs = (data.prefs as Partial<Prefs>) ?? {};
+  await savePrefs({
+    favorites: [...new Set([...state.prefs.favorites, ...(inPrefs.favorites ?? [])])],
+    videos: { ...(inPrefs.videos ?? {}), ...state.prefs.videos },
+  });
+  await loadAll();
+  const total = Object.values(added).reduce((a, b) => a + b, 0);
+  const parts = [
+    added.sets && `${fmtInt(added.sets)} séries`, added.measures && `${added.measures} pesées`, added.logs && `${added.logs} activités`,
+    added.tests && `${added.tests} tests`, added.recipes && `${added.recipes} recettes`, added.photos && `${added.photos} photos`,
+  ].filter(Boolean);
+  toast(total ? `Fusion terminée : ${parts.join(", ")} ajoutées.` : "Fusion terminée : rien de nouveau, tes données étaient déjà à jour.", "xp");
+  app.rerender();
+}
+
 export function applyTheme(): void {
   const t = state.prefs.theme;
   if (t === "auto") document.documentElement.removeAttribute("data-theme");
@@ -71,7 +131,9 @@ export const profile: View = {
     <label class="field" style="margin-top:8px"><span>Thème</span><select id="pf-theme"><option value="auto" ${p.theme === "auto" ? "selected" : ""}>Automatique</option><option value="light" ${p.theme === "light" ? "selected" : ""}>Clair</option><option value="dark" ${p.theme === "dark" ? "selected" : ""}>Sombre</option></select></label></section>
     <section class="card"><h3>Sauvegarde</h3><p class="hint">Le stockage d'un iPhone n'est pas garanti éternel : exporte ta sauvegarde de temps en temps (photos de recettes incluses).</p>
     <div class="row"><button class="btn primary" data-act="export-backup" style="--c:var(--xp)">Exporter mes données</button>
-    <label class="btn filebtn">Importer une sauvegarde<input type="file" id="bk-file" class="drop-input" aria-label="Choisir une sauvegarde"></label></div>
+    <label class="btn filebtn">Fusionner une sauvegarde<input type="file" id="bk-merge" class="drop-input" aria-label="Choisir une sauvegarde à fusionner"></label>
+    <label class="btn ghost filebtn">Remplacer par une sauvegarde<input type="file" id="bk-file" class="drop-input" aria-label="Choisir une sauvegarde qui remplacera tout"></label></div>
+    <p class="hint" style="margin-top:10px"><b>Passer d'un appareil à l'autre :</b> exporte sur le premier, mets le fichier dans iCloud Drive (ou envoie-le-toi), puis « Fusionner » sur le second. Fais-le dans les deux sens : rien n'est jamais effacé. « Remplacer » efface tout ce qui est sur cet appareil.</p>
     <p class="tiny" style="margin-top:12px">${fmtInt(state.sets.length)} séries · ${state.measures.length} pesées · ${state.logs.length} activités · ${state.recipes.length} recettes perso · ${state.tests.length} tests</p></section>`;
   },
   async click(act) {
@@ -85,6 +147,7 @@ export const profile: View = {
   async change(el) {
     const n = (id: string) => ($<HTMLInputElement>(id)!.value).trim();
     const num = (v: string) => (v === "" ? undefined : Number(v.replace(",", ".")));
+    if (el.id === "bk-merge") { const f = (el as HTMLInputElement).files?.[0]; if (f) await mergeBackup(f); (el as HTMLInputElement).value = ""; return; }
     if (el.id === "bk-file") { const f = (el as HTMLInputElement).files?.[0]; if (f) await importBackup(f); return; }
     if (el.id === "pf-name") await savePrefs({ name: n("#pf-name") || DEFAULT_PREFS.name });
     else if (el.id === "pf-bw") await savePrefs({ bodyweightKg: num(n("#pf-bw")) });
@@ -95,5 +158,9 @@ export const profile: View = {
     toast("Enregistré");
   },
 };
+
+
+
+
 
 
