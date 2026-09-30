@@ -60,8 +60,8 @@ export async function savePhoto(id: string, file: File): Promise<void> {
   if (old) { URL.revokeObjectURL(old); urls.delete(id); }
 }
 
-/** Transforme un lien YouTube en adresse intégrable ; null si le lien n'est pas reconnu. */
-export function embedUrl(link: string | undefined, autoplay = false): string | null {
+/** Identifiant de la vidéo d'un lien YouTube ; null si le lien n'est pas reconnu. */
+export function youtubeId(link: string | undefined): string | null {
   if (!link) return null;
   try {
     const u = new URL(link.trim());
@@ -71,15 +71,19 @@ export function embedUrl(link: string | undefined, autoplay = false): string | n
       if (u.pathname === "/watch") id = u.searchParams.get("v");
       else if (/^\/(embed|shorts|live)\//.test(u.pathname)) id = u.pathname.split("/")[2];
     }
-    if (!id || !/^[\w-]{6,20}$/.test(id)) return null;
-    const base = `https://www.youtube-nocookie.com/embed/${id}`;
-    // Lecture automatique : obligatoirement muette (sinon iOS et les navigateurs la bloquent), en boucle tant que l'étape dure
-    return autoplay ? `${base}?autoplay=1&mute=1&playsinline=1&rel=0&loop=1&playlist=${id}` : `${base}?rel=0&playsinline=1`;
+    return id && /^[\w-]{6,20}$/.test(id) ? id : null;
   } catch {
     return null;
   }
 }
 
+/** Adresse intégrable (pour les fiches recettes et le catalogue). */
+export function embedUrl(link: string | undefined, autoplay = false): string | null {
+  const id = youtubeId(link);
+  if (!id) return null;
+  const base = `https://www.youtube-nocookie.com/embed/${id}`;
+  return autoplay ? `${base}?autoplay=1&mute=1&playsinline=1&rel=0&loop=1&playlist=${id}` : `${base}?rel=0&playsinline=1`;
+}
 export const isHttpUrl = (s: string) => /^https?:\/\//i.test(s.trim());
 
 export function blobToDataUrl(b: Blob): Promise<string> {
@@ -94,5 +98,6 @@ export function blobToDataUrl(b: Blob): Promise<string> {
 export async function dataUrlToBlob(u: string): Promise<Blob> {
   return await (await fetch(u)).blob();
 }
+
 
 
