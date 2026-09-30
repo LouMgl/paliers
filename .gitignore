@@ -1,0 +1,7 @@
+﻿data/
+*.csv
+node_modules/
+dist/
+.env*
+.claude/
+SPEC.md
