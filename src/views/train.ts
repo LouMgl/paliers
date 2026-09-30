@@ -65,7 +65,7 @@ function importCard(): string {
   const err = errors.map((e) => `<li class="err">${esc(e)}</li>`).join("");
   return `<section class="card imp" aria-labelledby="imp-t"><h3 id="imp-t">Importer depuis Hevy</h3>
     <p class="hint">Dans Hevy : Profil → Réglages → Export &amp; Import Data. Tu peux envoyer les deux fichiers d'un coup ; ré-importer un nouvel export ne crée aucun doublon.</p>
-    <label class="drop" id="drop" tabindex="0"><input type="file" id="csvfile" accept=".csv,text/csv" multiple hidden><span><b>Touche pour choisir</b> ou glisse tes fichiers CSV ici</span></label>
+    <label class="drop" id="drop"><input type="file" id="csvfile" class="drop-input" multiple aria-label="Choisir les fichiers CSV Hevy"><span><b>Touche pour choisir</b> tes fichiers CSV (ou glisse-les ici)</span></label><p class="hint" id="imp-status" role="status"></p>
     ${prev || err ? `<ul class="plain">${prev}${err}</ul>` : ""}
     ${pending.length ? `<div class="row"><button class="btn primary" data-act="do-import" style="--c:var(--train)">Valider l'import</button><button class="btn ghost" data-act="cancel-import">Annuler</button></div>` : ""}</section>`;
 }
@@ -101,9 +101,13 @@ export const train: View = {
     const drop = document.getElementById("drop");
     const input = document.getElementById("csvfile") as HTMLInputElement | null;
     if (!drop || !input) return;
-    drop.addEventListener("click", (e) => { e.preventDefault(); input.click(); });
-    drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } });
-    input.addEventListener("change", () => { if (input.files?.length) void prepare([...input.files]); });
+    input.addEventListener("change", () => {
+      if (!input.files?.length) return;
+      const st = document.getElementById("imp-status");
+      if (st) st.textContent = "Lecture du fichier…";
+      const files = [...input.files];
+      prepare(files).catch((e) => { if (st) st.textContent = `Erreur : ${(e as Error).message}`; });
+    });
     drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
     drop.addEventListener("dragleave", () => drop.classList.remove("over"));
     drop.addEventListener("drop", (e) => {
@@ -121,4 +125,6 @@ export const train: View = {
     if (el.id === "exsel") { selected = el.value; app.rerender(); }
   },
 };
+
+
 

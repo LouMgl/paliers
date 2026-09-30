@@ -1,4 +1,4 @@
-// État en mémoire, rechargé depuis IndexedDB. Tout est recalculé après chaque changement.
+﻿// État en mémoire, rechargé depuis IndexedDB. Tout est recalculé après chaque changement.
 import { db, getSetting, setSetting, type Recipe } from "./db.ts";
 import { compute, type EngineResult } from "./engine.ts";
 import type { MeasureRow, SetRow } from "./hevy.ts";
@@ -27,6 +27,13 @@ export const state = {
   prefs: { ...DEFAULT_PREFS } as Prefs,
   result: null as unknown as EngineResult,
 };
+
+import { videoLink } from "./data/videos.ts";
+
+/** Vidéo d'un exercice ou d'une recette : lien choisi par toi, sinon lien par défaut. */
+export function videoFor(id: string): string | undefined {
+  return state.prefs.videos[id] || state.recipes.find((r) => r.id === id)?.videoUrl || videoLink(id);
+}
 
 export const pad = (n: number) => String(n).padStart(2, "0");
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -84,3 +91,4 @@ export function snapshot(): Snapshot {
 }
 
 recompute();
+

@@ -14,6 +14,14 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+  if (req.mode === "navigate") {
+    e.respondWith(
+      fetch(req)
+        .then((res) => { const c = res.clone(); caches.open(CACHE).then((cache) => cache.put(req, c)); return res; })
+        .catch(() => caches.match(req).then((r) => r || caches.match("./")))
+    );
+    return;
+  }
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
       const cached = await cache.match(req);
@@ -24,3 +32,4 @@ self.addEventListener("fetch", (e) => {
     })
   );
 });
+

@@ -1,4 +1,4 @@
-import { db } from "../db.ts";
+﻿import { db } from "../db.ts";
 import { characterExport } from "../engine.ts";
 import { blobToDataUrl, dataUrlToBlob, readText, saveJson } from "../files.ts";
 import { DEFAULT_PREFS, loadAll, savePrefs, state, type Prefs } from "../store.ts";
@@ -71,7 +71,7 @@ export const profile: View = {
     <label class="field" style="margin-top:8px"><span>Thème</span><select id="pf-theme"><option value="auto" ${p.theme === "auto" ? "selected" : ""}>Automatique</option><option value="light" ${p.theme === "light" ? "selected" : ""}>Clair</option><option value="dark" ${p.theme === "dark" ? "selected" : ""}>Sombre</option></select></label></section>
     <section class="card"><h3>Sauvegarde</h3><p class="hint">Le stockage d'un iPhone n'est pas garanti éternel : exporte ta sauvegarde de temps en temps (photos de recettes incluses).</p>
     <div class="row"><button class="btn primary" data-act="export-backup" style="--c:var(--xp)">Exporter mes données</button>
-    <label class="btn">Importer une sauvegarde<input type="file" id="bk-file" accept="application/json,.json" hidden></label></div>
+    <label class="btn filebtn">Importer une sauvegarde<input type="file" id="bk-file" class="drop-input" aria-label="Choisir une sauvegarde"></label></div>
     <p class="tiny" style="margin-top:12px">${fmtInt(state.sets.length)} séries · ${state.measures.length} pesées · ${state.logs.length} activités · ${state.recipes.length} recettes perso · ${state.tests.length} tests</p></section>`;
   },
   async click(act) {
@@ -95,3 +95,5 @@ export const profile: View = {
     toast("Enregistré");
   },
 };
+
+

@@ -1,11 +1,11 @@
-import "@fontsource/figtree/400.css";
+﻿import "@fontsource/figtree/400.css";
 import "@fontsource/figtree/600.css";
 import "@fontsource/figtree/700.css";
 import "@fontsource/pixelify-sans/500.css";
 import "@fontsource/pixelify-sans/700.css";
 import "./styles.css";
 import { db, getSetting, setSetting } from "./db.ts";
-import { loadAll, savePrefs, state } from "./store.ts";
+import { loadAll, savePrefs, state, videoFor } from "./store.ts";
 import { app, closeDlg, toast, $ } from "./ui.ts";
 import { embedUrl, isHttpUrl } from "./files.ts";
 import { home } from "./views/home.ts";
@@ -43,7 +43,7 @@ app.rerender = () => { void render(); };
 app.go = (t) => { void go(t); };
 
 async function setVideo(id: string): Promise<void> {
-  const cur = state.prefs.videos[id] ?? state.recipes.find((r) => r.id === id)?.videoUrl ?? "";
+  const cur = videoFor(id) ?? "";
   const url = prompt("Colle ici le lien de la vidéo (YouTube). Laisse vide pour l'enlever.", cur);
   if (url === null) return;
   const clean = url.trim();
@@ -94,3 +94,5 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
 }
+
+

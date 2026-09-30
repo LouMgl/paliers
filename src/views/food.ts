@@ -1,6 +1,7 @@
-import { db, type Recipe } from "../db.ts";
+﻿import { db, type Recipe } from "../db.ts";
 import { RECIPES, TYPES } from "../data/recipes.ts";
-import { addLog, dayKey, savePrefs, snapshot, state } from "../store.ts";
+import { addLog, dayKey, savePrefs, snapshot, state, videoFor } from "../store.ts";
+import { PHOTO_CREDITS, builtinPhoto } from "../data/photos.ts";
 import { RPG } from "../rpg.config.ts";
 import { app, celebrate, closeDlg, esc, openDlg, toast, videoBlock, $ } from "../ui.ts";
 import { embedUrl, isHttpUrl, loadPhotoUrls, savePhoto } from "../files.ts";
@@ -13,11 +14,11 @@ let photos = new Map<string, string>();
 let formPhoto: File | null = null;
 
 const all = (): Recipe[] => [...RECIPES, ...state.recipes.map((r) => ({ ...r, custom: true }))];
-const videoOf = (r: Recipe) => r.custom ? r.videoUrl : state.prefs.videos[r.id];
+const videoOf = (r: Recipe) => videoFor(r.id);
 const cookedCount = (id: string) => state.logs.filter((l) => l.type === "cook" && l.ref === id).length;
 
 function thumb(r: Recipe): string {
-  const u = photos.get(r.id);
+  const u = photos.get(r.id) ?? builtinPhoto(r.id);
   return u
     ? `<img class="rc-img" src="${u}" alt="" loading="lazy">`
     : `<div class="rc-img ph" aria-hidden="true">${esc(TYPES[r.type].charAt(0))}</div>`;
@@ -45,14 +46,16 @@ function openRecipe(id: string): void {
   const done = state.logs.some((l) => l.type === "cook" && l.ref === id && l.day === dayKey());
   const fav = state.prefs.favorites.includes(id);
   const url = videoOf(r);
-  const big = photos.get(id);
+  const mine = photos.get(id);
+  const big = mine ?? builtinPhoto(id);
+  const cr = !mine ? PHOTO_CREDITS[id] : undefined;
   openDlg(`<h2 id="dlgTitle">${esc(r.nom)}</h2>
-    ${big ? `<img class="rc-big" src="${big}" alt="Photo de ${esc(r.nom)}">` : ""}
+    ${big ? `<img class="rc-big" src="${big}" alt="Photo de ${esc(r.nom)}">` : ""}${cr ? `<p class="credit">Photo : ${esc(cr.auteur)}, ${esc(cr.licence)}, <a href="${esc(cr.page)}" target="_blank" rel="noopener">via Wikimedia Commons</a></p>` : ""}
     <div class="rm"><span><b>${esc(r.kcal)}</b> kcal</span><span><b>${esc(r.proteines)}</b> g protéines</span><span><b>${esc(r.temps)}</b> min</span></div>
     <p class="hint">Valeurs approximatives, pour une portion.</p>
     <h3 style="margin-top:12px">Ingrédients</h3><ul>${r.ingredients.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
     <h3>Préparation</h3><ol>${r.etapes.map((i) => `<li>${esc(i)}</li>`).join("")}</ol>
-    <h3>Vidéo</h3>${videoBlock(r.id, url, embedUrl(url))}
+    <h3>Vidéo</h3>${videoBlock(r.id, url, embedUrl(url, true))}
     <div class="row"><button class="btn primary" data-act="cook" data-id="${esc(id)}" style="--c:var(--food)" ${done ? "disabled" : ""}>${done ? "Déjà cuisinée aujourd'hui" : `J'ai cuisiné cette recette (+${RPG.xp.recipeCooked} XP)`}</button>
     <button class="btn" data-act="fav" data-id="${esc(id)}" aria-pressed="${fav}">${fav ? "★ Favori" : "☆ Ajouter aux favoris"}</button>
     <label class="btn ghost">Photo<input type="file" accept="image/*" hidden data-photo-for="${esc(id)}"></label>
@@ -146,3 +149,9 @@ export const food: View = {
 };
 
 export function setCat(c: string): void { cat = c; }
+
+
+
+
+
+

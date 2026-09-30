@@ -1,4 +1,4 @@
-// Petits outils d'interface : échappement, notifications, boîtes de dialogue, célébrations.
+﻿// Petits outils d'interface : échappement, notifications, boîtes de dialogue, célébrations.
 import { RPG } from "./rpg.config.ts";
 import { state, type Snapshot } from "./store.ts";
 
@@ -104,11 +104,11 @@ export function xpBar(pct: number, segments = 20): string {
 /** Permet aux vues de demander un nouvel affichage sans import circulaire. */
 export const app = { rerender: (): void => {}, go: (_tab: string): void => {} };
 
-export function videoBlock(id: string, url: string | undefined, embed: string | null): string {
+export function videoBlock(id: string, url: string | undefined, embed: string | null, tall = false): string {
   const online = navigator.onLine;
   let body: string;
   if (url && embed && online) {
-    body = `<div class="video"><iframe src="${esc(embed)}" title="Vidéo de démonstration" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+    body = `<div class="video${tall ? " tall" : ""}"><iframe src="${esc(embed)}" title="Vidéo de démonstration" loading="lazy" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
   } else if (url) {
     body = `<p class="hint">${online ? "Ce lien n'est pas une vidéo YouTube intégrable." : "Pas de connexion : la vidéo n'est pas disponible."} Les consignes écrites restent valables.</p>${/^https?:\/\//i.test(url) ? `<p><a href="${esc(url)}" target="_blank" rel="noopener">Ouvrir le lien</a></p>` : ""}`;
   } else {
@@ -116,3 +116,6 @@ export function videoBlock(id: string, url: string | undefined, embed: string | 
   }
   return `${body}<button class="btn ghost small" data-act="set-video" data-id="${esc(id)}">${url ? "Changer le lien vidéo" : "Ajouter un lien vidéo"}</button>`;
 }
+
+
+

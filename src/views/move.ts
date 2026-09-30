@@ -1,9 +1,9 @@
-import { db } from "../db.ts";
+﻿import { db } from "../db.ts";
 import { MOMENTS, MOVES, MOVE_BY_ID, ROUTINES, TESTS, ZONES, buildSteps, routineMinutes, type Moment, type Routine, type StepPlan, type Zone } from "../data/mobility.ts";
 import { testsImproved, type MobilityTest } from "../engine.ts";
 import { lineChart } from "../charts.ts";
 import { RPG } from "../rpg.config.ts";
-import { addLog, dayKey, snapshot, state } from "../store.ts";
+import { addLog, dayKey, snapshot, state, videoFor } from "../store.ts";
 import { app, beep, celebrate, closeDlg, esc, fmtDate, openDlg, toast, vibrate, videoBlock, $ } from "../ui.ts";
 import { embedUrl } from "../files.ts";
 import type { View } from "./types.ts";
@@ -86,11 +86,13 @@ function renderPlayer(): string {
   const p = P!;
   const st = p.steps[p.i];
   const total = p.steps.length - 1;
-  const url = state.prefs.videos[st.id];
+  const url = st.prep ? undefined : videoFor(st.id);
+  const emb = embedUrl(url, true);
+  const vid = emb && navigator.onLine ? `<div class="video"><iframe src="${esc(emb)}" title="Démonstration : ${esc(st.nom)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>` : "";
   return `<div class="player"><p class="prog">${st.prep ? "Prépare-toi" : `Étape ${p.i} sur ${total}`}</p>
     <div class="ring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="tr" cx="60" cy="60" r="52"/><circle class="pg" id="pg" cx="60" cy="60" r="52" stroke-dasharray="${CIRC}" stroke-dashoffset="0"/></svg><div class="num" id="tnum" role="timer">${fmt(st.duree)}</div></div>
-    <h2>${esc(st.nom)}</h2>${st.side ? `<p class="side">Côté ${st.side}</p>` : ""}<p class="cue">${esc(st.consignes)}</p>
-    <div class="pbtns"><button class="btn" data-act="pause" id="pbtn">Pause</button><button class="btn" data-act="skip">Passer</button>${st.prep ? "" : `<button class="btn ghost" data-act="show-video" data-id="${esc(st.id)}">${url ? "Vidéo" : "Vidéo ?"}</button>`}<button class="btn ghost" data-act="quit">Quitter</button></div>
+    ${vid}<h2>${esc(st.nom)}</h2>${st.side ? `<p class="side">Côté ${st.side}</p>` : ""}<p class="cue">${esc(st.consignes)}</p>
+    <div class="pbtns"><button class="btn" data-act="pause" id="pbtn">Pause</button><button class="btn" data-act="skip">Passer</button><button class="btn ghost" data-act="quit">Quitter</button></div>
     <p class="hint">Douleur vive, douleur qui descend dans la jambe ou fourmillements : arrête.</p></div>`;
 }
 
@@ -149,7 +151,7 @@ async function saveTest(): Promise<void> {
 function catalogue(): string {
   const byZone = (Object.keys(ZONES) as Zone[]).map((z) => {
     const items = MOVES.filter((m) => m.zone === z).map((m) => {
-      const url = state.prefs.videos[m.id];
+      const url = videoFor(m.id);
       return `<details class="mv"><summary><b>${esc(m.nom)}</b> <span class="d">${m.duree} s${m.cotes ? " par côté" : ""}${m.dynamique ? " · dynamique" : ""}</span></summary>
         <p>${esc(m.consignes)}</p><p><b>Erreurs fréquentes :</b> ${esc(m.erreurs)}</p><p><b>Pour progresser :</b> ${esc(m.progression)}</p>${videoBlock(m.id, url, embedUrl(url))}</details>`;
     }).join("");
@@ -191,7 +193,7 @@ export const move: View = {
     else if (act === "show-video") {
       if (P && !P.paused) { P.remain = Math.max(0, Math.ceil((P.endAt - Date.now()) / 1000)); P.paused = true; const b = document.getElementById("pbtn"); if (b) b.textContent = "Reprendre"; }
       const id = el.dataset.id!;
-      const url = state.prefs.videos[id];
+      const url = videoFor(id);
       openDlg(`<h2 id="dlgTitle">${esc(MOVE_BY_ID[id]?.nom ?? "Vidéo")}</h2>${videoBlock(id, url, embedUrl(url))}<p class="hint">Le minuteur est en pause. Reprends-le quand tu veux.</p><div class="row"><button class="btn" data-act="close">Fermer</button></div>`);
     }
   },
@@ -200,3 +202,9 @@ export const move: View = {
 };
 
 export function setMoment(m: string): void { moment = m as Moment | "all"; }
+
+
+
+
+
+
