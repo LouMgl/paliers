@@ -1,0 +1,21 @@
+﻿import fs from "node:fs";
+import { parseWorkoutCsv, parseHevyDate, parseMeasuresCsv, detectKind } from "../src/hevy.ts";
+import { compute, characterExport } from "../src/engine.ts";
+
+const text = fs.readFileSync("data/workout_data.csv", "utf8");
+console.log("kind:", detectKind(text));
+const p = parseWorkoutCsv(text);
+console.log(p.summary, p.unit, "skipped", p.skipped);
+console.log("dates:", parseHevyDate("28 sept. 2026, 12:34")?.iso, parseHevyDate("11 juil. 2026, 14:37")?.iso, parseHevyDate("9 juin 2026, 01:00")?.iso, parseHevyDate("12 nov. 2025, 20:07")?.iso, parseHevyDate("28 Sep 2026, 12:34")?.iso);
+const keys = new Set(p.sets.map((s) => s.key));
+console.log("clés uniques:", keys.size, "/", p.sets.length);
+const m = parseMeasuresCsv("date,weight_kg,fat_percent\n2026-02-25,65.5,\n2026-09-01,67.2,\n");
+console.log("mesures test:", m.measures);
+const r = compute({ sets: p.sets, measures: m.measures, logs: [], tests: [], today: "2026-09-30" });
+console.log("XP", r.totalXp, "niveau", r.level, r.rank, "séances", r.totalSessions, "records", r.records.length);
+console.log("stats", r.stats, "streak sem.", r.streakWeeks);
+console.table(r.lifts);
+console.table(r.exercises.slice(0, 8).map((e) => ({ n: e.name, k: e.kind, first: +e.first.toFixed(1), best: +e.best.toFixed(1), lvl: e.level })));
+console.log(r.sessions.slice(0, 3), r.sessions.slice(-2));
+console.log("quêtes", r.weeklyQuests.map((q) => q.label + " " + q.done + " " + (q.progress ?? "")));
+console.log(JSON.stringify(characterExport(r, "Héros", [], "x")).slice(0, 300));
