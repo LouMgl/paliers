@@ -22,6 +22,8 @@ export const RPG = {
     /** …plafonné à ce nombre de points */
     tonnageCap: 40,
     perRecord: 40,
+    /** Plafond d'XP par séance : la progression sûre et la régularité comptent plus qu'une séance record */
+    sessionCap: 200,
     /** Bonus de série : +5 % par semaine consécutive d'entraînement, jusqu'à +20 % */
     streakBonusPerWeek: 0.05,
     streakBonusMax: 0.2,
@@ -75,3 +77,4 @@ export const RPG = {
 };
 
 export type Rank = (typeof RPG.ranks)[number];
+

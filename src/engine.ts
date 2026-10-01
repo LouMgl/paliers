@@ -221,7 +221,7 @@ export function compute(input: EngineInput): EngineResult {
       RPG.xp.perRecord * records.length;
     sessions.push({
       start: st, day, title: rows[0].title, sets: nSets, tonnage: Math.round(tonnage), records,
-      xp: Math.round(raw * (1 + bonusPct)), bonusPct,
+      xp: Math.min(RPG.xp.sessionCap, Math.round(raw * (1 + bonusPct))), bonusPct,
     });
     weekSessions.set(week, (weekSessions.get(week) ?? 0) + 1);
   }
@@ -390,3 +390,4 @@ export function characterExport(r: EngineResult, name: string, badgesOk: string[
     badges: badgesOk,
   };
 }
+
