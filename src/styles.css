@@ -335,3 +335,4 @@ body.playing .nav{display:none}
 .fs-cover b:empty{display:none}
 .fs-cover span{font-size:17px;opacity:.95}
 .fs-tap{position:absolute;left:0;right:0;bottom:0;z-index:3;background:rgba(0,0,0,.72);color:#fff;font-size:14px;font-weight:600;padding:8px 12px;text-align:center;pointer-events:none}
+.tag.ctx{background:var(--food);color:var(--on)}

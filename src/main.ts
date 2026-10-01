@@ -10,7 +10,7 @@ import { app, closeDlg, toast, $ } from "./ui.ts";
 import { embedUrl, isHttpUrl } from "./files.ts";
 import { home } from "./views/home.ts";
 import { train } from "./views/train.ts";
-import { food, setCat } from "./views/food.ts";
+import { food, setCat, setCtx } from "./views/food.ts";
 import { move, setMoment } from "./views/move.ts";
 import { profile, applyTheme } from "./views/profile.ts";
 import type { View } from "./views/types.ts";
@@ -66,6 +66,7 @@ document.addEventListener("click", (e) => {
   if (t.dataset.tab) { void go(t.dataset.tab); return; }
   if (t.dataset.go) { void go(t.dataset.go); return; }
   if (t.dataset.cat !== undefined) { setCat(t.dataset.cat); void render(); return; }
+  if (t.dataset.ctx !== undefined) { setCtx(t.dataset.ctx); void render(); return; }
   if (t.dataset.mom !== undefined) { setMoment(t.dataset.mom); void render(); return; }
   const act = t.dataset.act;
   if (!act) return;
@@ -94,5 +95,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   });
 }
+
+
 
 

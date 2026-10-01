@@ -1,4 +1,4 @@
-import Dexie, { type Table } from "dexie";
+﻿import Dexie, { type Table } from "dexie";
 import type { SetRow, MeasureRow } from "./hevy.ts";
 import type { LogRow, MobilityTest } from "./engine.ts";
 
@@ -16,6 +16,11 @@ export interface Recipe {
   type: "petit-dej" | "repas" | "snack" | "boisson";
   kcal: number;
   proteines: number;
+  /** Macros par portion (facultatives pour les anciennes recettes) */
+  glucides?: number;
+  lipides?: number;
+  /** Quand la recette convient le mieux */
+  contexte?: "entrainement" | "petit-appetit" | "polyvalent";
   temps: number;
   tags: string[];
   ingredients: string[];
@@ -61,3 +66,4 @@ export async function getSetting<T>(key: string): Promise<T | undefined> {
 export async function setSetting(key: string, value: unknown): Promise<void> {
   await db.settings.put({ key, value });
 }
+

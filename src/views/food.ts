@@ -1,5 +1,5 @@
 ﻿import { db, type Recipe } from "../db.ts";
-import { RECIPES, TYPES } from "../data/recipes.ts";
+import { CONTEXTES, RECIPES, TYPES } from "../data/recipes.ts";
 import { addLog, dayKey, savePrefs, snapshot, state, videoFor } from "../store.ts";
 import { PHOTO_CREDITS, builtinPhoto } from "../data/photos.ts";
 import { RPG } from "../rpg.config.ts";
@@ -8,6 +8,7 @@ import { embedUrl, isHttpUrl, loadPhotoUrls, savePhoto } from "../files.ts";
 import type { View } from "./types.ts";
 
 let cat = "all";
+let ctx = "all";
 let q = "";
 let onlyFav = false;
 let photos = new Map<string, string>();
@@ -28,6 +29,7 @@ function grid(): string {
   const term = q.trim().toLowerCase();
   const list = all().filter((r) =>
     (cat === "all" || r.type === cat) &&
+    (ctx === "all" || r.contexte === ctx) &&
     (!onlyFav || state.prefs.favorites.includes(r.id)) &&
     (!term || `${r.nom} ${r.tags.join(" ")} ${r.ingredients.join(" ")}`.toLowerCase().includes(term)));
   if (!list.length) return `<div class="empty">Aucune recette ne correspond. Essaie un autre filtre ou ajoute la tienne.</div>`;
@@ -36,7 +38,7 @@ function grid(): string {
     const fav = state.prefs.favorites.includes(r.id);
     return `<button class="card rc" data-act="open-recipe" data-id="${esc(r.id)}">${thumb(r)}<span class="cat">${TYPES[r.type]}${r.custom ? " (la tienne)" : ""}${fav ? " · ★" : ""}</span><h3>${esc(r.nom)}</h3>
       <div class="rm"><span><b>${esc(r.kcal)}</b> kcal</span><span><b>${esc(r.proteines)}</b> g prot.</span><span><b>${esc(r.temps)}</b> min</span></div>
-      <div class="tags">${r.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>${n ? `<span class="cooked">Cuisinée ${n} fois</span>` : ""}</button>`;
+      <div class="tags">${r.contexte ? `<span class="tag ctx">${CONTEXTES[r.contexte]}</span>` : ""}${r.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div>${n ? `<span class="cooked">Cuisinée ${n} fois</span>` : ""}</button>`;
   }).join("");
 }
 
@@ -51,8 +53,8 @@ function openRecipe(id: string): void {
   const cr = !mine ? PHOTO_CREDITS[id] : undefined;
   openDlg(`<h2 id="dlgTitle">${esc(r.nom)}</h2>
     ${big ? `<img class="rc-big" src="${big}" alt="Photo de ${esc(r.nom)}">` : ""}${cr ? `<p class="credit">Photo : ${esc(cr.auteur)}, ${esc(cr.licence)}, <a href="${esc(cr.page)}" target="_blank" rel="noopener">via Wikimedia Commons</a></p>` : ""}
-    <div class="rm"><span><b>${esc(r.kcal)}</b> kcal</span><span><b>${esc(r.proteines)}</b> g protéines</span><span><b>${esc(r.temps)}</b> min</span></div>
-    <p class="hint">Valeurs approximatives, pour une portion.</p>
+    <div class="rm"><span><b>${esc(r.kcal)}</b> kcal</span><span><b>${esc(r.proteines)}</b> g protéines</span>${r.glucides !== undefined ? `<span><b>${esc(r.glucides)}</b> g glucides</span>` : ""}${r.lipides !== undefined ? `<span><b>${esc(r.lipides)}</b> g lipides</span>` : ""}<span><b>${esc(r.temps)}</b> min</span></div>
+    <p class="hint">Valeurs approximatives, par portion.${r.contexte ? ` Contexte : ${CONTEXTES[r.contexte].toLowerCase()}.` : ""}</p>
     <h3 style="margin-top:12px">Ingrédients</h3><ul>${r.ingredients.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
     <h3>Préparation</h3><ol>${r.etapes.map((i) => `<li>${esc(i)}</li>`).join("")}</ol>
     <h3>Vidéo</h3>${videoBlock(r.id, url, embedUrl(url, true))}
@@ -69,6 +71,9 @@ function openForm(existing?: Recipe): void {
   openDlg(`<h2 id="dlgTitle">${r ? "Modifier la recette" : "Ajouter une recette"}</h2>
     <label class="field"><span>Nom</span><input type="text" id="rf-name" value="${esc(r?.nom)}"></label>
     <label class="field"><span>Type</span><select id="rf-type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${r?.type === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+    <label class="field"><span>Contexte</span><select id="rf-ctx"><option value="">Non précisé</option>${Object.entries(CONTEXTES).map(([k, v]) => `<option value="${k}" ${r?.contexte === k ? "selected" : ""}>${v}</option>`).join("")}</select></label>
+    <p class="hint">Valeurs par portion.</p>
+    <div class="frow"><label class="field"><span>Glucides (g)</span><input type="number" inputmode="numeric" id="rf-g" min="0" value="${r?.glucides ?? ""}"></label><label class="field"><span>Lipides (g)</span><input type="number" inputmode="numeric" id="rf-l" min="0" value="${r?.lipides ?? ""}"></label><span></span></div>
     <div class="frow"><label class="field"><span>Calories</span><input type="number" inputmode="numeric" id="rf-kcal" min="0" value="${r ? r.kcal : ""}"></label><label class="field"><span>Protéines (g)</span><input type="number" inputmode="numeric" id="rf-p" min="0" value="${r ? r.proteines : ""}"></label><label class="field"><span>Temps (min)</span><input type="number" inputmode="numeric" id="rf-min" min="0" value="${r ? r.temps : ""}"></label></div>
     <label class="field"><span>Ingrédients, un par ligne</span><textarea id="rf-ing">${esc(r?.ingredients.join("\n"))}</textarea></label>
     <label class="field"><span>Étapes, une par ligne</span><textarea id="rf-steps">${esc(r?.etapes.join("\n"))}</textarea></label>
@@ -87,6 +92,9 @@ async function saveRecipe(id: string): Promise<void> {
   const rec: Recipe = {
     id: rid, nom: name, type: $<HTMLSelectElement>("#rf-type")!.value as Recipe["type"],
     kcal: +$<HTMLInputElement>("#rf-kcal")!.value || 0, proteines: +$<HTMLInputElement>("#rf-p")!.value || 0,
+    glucides: $<HTMLInputElement>("#rf-g")!.value === "" ? undefined : +$<HTMLInputElement>("#rf-g")!.value,
+    lipides: $<HTMLInputElement>("#rf-l")!.value === "" ? undefined : +$<HTMLInputElement>("#rf-l")!.value,
+    contexte: ($<HTMLSelectElement>("#rf-ctx")!.value || undefined) as Recipe["contexte"],
     temps: +$<HTMLInputElement>("#rf-min")!.value || 0, tags: ["Perso"],
     ingredients: lines("#rf-ing"), etapes: lines("#rf-steps"), videoUrl: video || undefined, custom: true,
   };
@@ -104,9 +112,11 @@ export const food: View = {
     photos = await loadPhotoUrls();
     const chips = [["all", "Tout"], ...Object.entries(TYPES)].map(([k, v]) => `<button class="chip" data-cat="${k}" aria-pressed="${cat === k}">${v}</button>`).join("")
       + `<button class="chip" data-act="only-fav" aria-pressed="${onlyFav}">★ Favoris</button>`;
+    const hasCtx = all().some((r) => r.contexte);
+    const ctxChips = hasCtx ? `<div class="chips" role="group" aria-label="Filtrer par contexte">${[["all", "Tous contextes"], ...Object.entries(CONTEXTES)].map(([k, v]) => `<button class="chip" data-ctx="${k}" aria-pressed="${ctx === k}">${v}</button>`).join("")}</div>` : "";
     return `<div class="section-head"><h2>Cuisine</h2><button class="btn small" data-act="new-recipe">Ajouter une recette</button></div>
       <p class="lede">Des recettes simples pour manger plus sans te forcer. Les valeurs sont approximatives, pour une portion.</p>
-      <div class="chips" role="group" aria-label="Filtrer par type">${chips}</div>
+      <div class="chips" role="group" aria-label="Filtrer par type">${chips}</div>${ctxChips}
       <input class="search" type="search" id="q" placeholder="Chercher une recette" aria-label="Chercher une recette" value="${esc(q)}">
       <div class="rgrid" id="rgrid">${grid()}</div>`;
   },
@@ -149,6 +159,17 @@ export const food: View = {
 };
 
 export function setCat(c: string): void { cat = c; }
+export function setCtx(c: string): void { ctx = c; }
+
+
+
+
+
+
+
+
+
+
 
 
 

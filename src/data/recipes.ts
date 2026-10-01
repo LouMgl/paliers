@@ -1,4 +1,4 @@
-import type { Recipe } from "../db.ts";
+﻿import type { Recipe } from "../db.ts";
 
 // Catalogue de départ (tiré du prototype). Les macros sont approximatives, pour une portion.
 export const RECIPES: Recipe[] = [
@@ -296,9 +296,16 @@ export const RECIPES: Recipe[] = [
   }
 ];
 
+export const CONTEXTES: Record<NonNullable<Recipe["contexte"]>, string> = {
+  entrainement: "Jour d'entraînement",
+  "petit-appetit": "Petit appétit",
+  polyvalent: "Polyvalent",
+};
+
 export const TYPES: Record<Recipe["type"], string> = {
   "petit-dej": "Petit-déjeuner",
   repas: "Repas",
   snack: "Snack",
   boisson: "Boisson",
 };
+
